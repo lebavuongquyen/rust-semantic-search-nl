@@ -58,12 +58,17 @@ src/
 ### Rust & WebAssembly
 
 ```powershell
-# Run all unit and integration test suites (32 passed, 0 failed)
+# 1. Run all unit and integration test suites (32 passed, 0 failed)
 cargo test
 
-# Verify WebAssembly target compilation
-cargo check --target wasm32-unknown-unknown
+# 2. Run CLI search in terminal directly (executable target\release\search_cli.exe)
+cargo run --release --bin search_cli -- "tìm hóa đơn dịch vụ"
+
+# 3. Build WebAssembly release binary (target\wasm32-unknown-unknown\release\semantic_search_agent.wasm - 607 KB)
 cargo build --target wasm32-unknown-unknown --release
+
+# 4. Generate JavaScript/TypeScript package bindings for Web/NodeJS/Electron (pkg/ directory - 164 KB wasm)
+wasm-bindgen target/wasm32-unknown-unknown/release/semantic_search_agent.wasm --out-dir pkg --target web
 ```
 
 ### TypeScript Contracts
