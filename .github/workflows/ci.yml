@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test & Verify Quality Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Rust Unit and Integration Tests (32 suites)
+        run: cargo test --verbose
+
+      - name: Verify WebAssembly Target Compilation
+        run: cargo check --target wasm32-unknown-unknown --verbose
+
+      - name: TypeScript Contract Tests
+        run: |
+          npx --yes tsx ts/tests/provider-contract.test.ts
+          npx --package typescript tsc --noEmit ts/*.ts ts/tests/*.ts
