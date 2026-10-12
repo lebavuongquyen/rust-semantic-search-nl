@@ -1,0 +1,70 @@
+[
+  {
+    "id": "q01-catalyst-receipt",
+    "query": "tìm biên lại thu tiền tháng 8",
+    "query_language": "vi",
+    "expected_document_language": "vi",
+    "description": "Catalyst case: typo 'biên lại' + vocabulary gap (biên lai vs giấy nộp tiền) + month 8",
+    "relevant_docs": {
+      "doc-bidv-receipt": 2
+    },
+    "hard_negatives": ["doc-en-invoice-aug", "doc-guidelines-md"]
+  },
+  {
+    "id": "q02-cross-vi-to-en-invoice",
+    "query": "tìm hóa đơn dịch vụ",
+    "query_language": "vi",
+    "expected_document_language": "en",
+    "description": "Cross-lingual retrieval: Vietnamese query for invoices finding English invoice",
+    "relevant_docs": {
+      "doc-en-invoice-aug": 2
+    },
+    "hard_negatives": ["doc-en-payment-receipt", "doc-hard-negative-invoice-draft"]
+  },
+  {
+    "id": "q03-cross-en-to-vi-contract",
+    "query": "find signed contract",
+    "query_language": "en",
+    "expected_document_language": "vi",
+    "description": "Cross-lingual retrieval: English query finding Vietnamese signed contract and English signed contract",
+    "relevant_docs": {
+      "doc-vi-contract-signed": 2,
+      "doc-en-contract-signed": 2
+    },
+    "hard_negatives": ["doc-guidelines-md", "doc-hard-negative-invoice-draft"]
+  },
+  {
+    "id": "q04-cross-vi-to-en-receipt",
+    "query": "biên lai thanh toán",
+    "query_language": "vi",
+    "expected_document_language": "en",
+    "description": "Cross-lingual retrieval: Vietnamese receipt finding English receipt REC-9921 and BIDV receipt",
+    "relevant_docs": {
+      "doc-en-payment-receipt": 2,
+      "doc-bidv-receipt": 2
+    },
+    "hard_negatives": ["doc-en-invoice-aug"]
+  },
+  {
+    "id": "q05-coding-login-error",
+    "query": "lỗi đăng nhập credentials",
+    "query_language": "vi",
+    "expected_document_language": "en",
+    "description": "Coding agent query for login authentication error",
+    "relevant_docs": {
+      "doc-auth-code-login": 2
+    },
+    "hard_negatives": ["doc-guidelines-md"]
+  },
+  {
+    "id": "q06-docs-guidelines",
+    "query": "tài liệu hướng dẫn kiến trúc",
+    "query_language": "vi",
+    "expected_document_language": "en",
+    "description": "Documentation query in Vietnamese finding English guidelines",
+    "relevant_docs": {
+      "doc-guidelines-md": 2
+    },
+    "hard_negatives": ["doc-en-invoice-aug"]
+  }
+]

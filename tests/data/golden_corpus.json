@@ -1,0 +1,58 @@
+[
+  {
+    "id": "doc-bidv-receipt",
+    "title": "Giấy nộp tiền lệ phí hộ tịch BIDV H29.243-260824-150060",
+    "file_path": "finance/receipts/H29.243-260824-150060.pdf",
+    "content": "GIẤY NỘP TIỀN THU PHÍ, LỆ PHÍ VÀ THU PHẠT VI PHẠM HÀNH CHÍNH\nMã hồ sơ: H29.243-260824-150060\nTên phí, lệ phí: Lệ phí hộ tịch\nNgười nộp: Lê Bá Vương Quyến\nĐịa chỉ: Xã Bà Điểm, Thành phố Hồ Chí Minh\nSố tiền: 80,000 VND\nNgười nộp tiền - Ngày 24 Tháng 08 Năm 2026\nNgân hàng TMCP Đầu tư và Phát triển Việt Nam BIDV\nChữ ký số: HILO-CA SHA-256",
+    "metadata": { "category": "receipt", "language": "vi", "year": "2026", "month": "8" }
+  },
+  {
+    "id": "doc-en-invoice-aug",
+    "title": "Consulting Services Invoice INV-2026-088",
+    "file_path": "finance/invoices/invoice_august_2026.pdf",
+    "content": "INVOICE\nInvoice Number: INV-2026-088\nDate: August 28, 2026\nBill To: Acme Corporation\nDescription: Cloud architecture and search consulting services\nAmount Due: $4,500.00 USD\nPayment due within 30 days via wire transfer.",
+    "metadata": { "category": "invoice", "language": "en", "year": "2026", "month": "8" }
+  },
+  {
+    "id": "doc-en-payment-receipt",
+    "title": "Official Payment Receipt REC-9921",
+    "file_path": "finance/receipts/payment_receipt_9921.pdf",
+    "content": "PAYMENT RECEIPT\nReceipt ID: REC-9921\nReceived From: John Doe\nAmount Paid: $120.00 USD\nDate: August 15, 2026\nStatus: Paid in Full\nThank you for your business.",
+    "metadata": { "category": "receipt", "language": "en", "year": "2026", "month": "8" }
+  },
+  {
+    "id": "doc-vi-contract-signed",
+    "title": "Hợp đồng kinh tế dịch vụ phần mềm số 18/2026/HĐKT",
+    "file_path": "legal/hop_dong_dich_vu_2026.pdf",
+    "content": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\nHỢP ĐỒNG KINH TẾ DỊCH VỤ PHẦN MỀM\nSố: 18/2026/HĐKT\nCăn cứ Luật Thương mại Việt Nam.\nHai bên đồng ý ký kết thỏa thuận cung cấp giải pháp tìm kiếm dữ liệu lớn.\nHợp đồng đã ký ngày 10 tháng 07 năm 2026 bởi đại diện hai bên.",
+    "metadata": { "category": "contract", "language": "vi", "year": "2026", "status": "signed" }
+  },
+  {
+    "id": "doc-en-contract-signed",
+    "title": "Signed Master Services Agreement MSA-2026",
+    "file_path": "legal/signed_msa_2026.pdf",
+    "content": "MASTER SERVICES AGREEMENT\nContract Ref: MSA-2026-FINAL\nThis Agreement is entered into between Provider and Client.\nScope of Work: Semantic search engine implementation.\nStatus: Fully executed and signed contract.\nEffective Date: July 15, 2026.",
+    "metadata": { "category": "contract", "language": "en", "year": "2026", "status": "signed" }
+  },
+  {
+    "id": "doc-auth-code-login",
+    "title": "Authentication Controller login.ts",
+    "file_path": "src/controllers/auth/login.ts",
+    "content": "export async function loginHandler(req: Request, res: Response) {\n  const { username, password } = req.body;\n  if (!username || !password) {\n    return res.status(400).json({ error: 'Missing credentials' });\n  }\n  const user = await authenticateUser(username, password);\n  if (!user) {\n    return res.status(401).json({ error: 'Invalid username or password' });\n  }\n  const token = generateJwt(user);\n  return res.json({ token });\n}",
+    "metadata": { "category": "code", "language": "typescript" }
+  },
+  {
+    "id": "doc-guidelines-md",
+    "title": "Architecture Guidelines and Documentation",
+    "file_path": "docs/guidelines.md",
+    "content": "# Architecture Guidelines\nThis document describes system design, coding standards, and provider-neutral specifications.\nAll search modules must maintain strict privacy and zero-knowledge storage.\nRefer to documentation for user manual and guides.",
+    "metadata": { "category": "documentation", "language": "en" }
+  },
+  {
+    "id": "doc-hard-negative-invoice-draft",
+    "title": "Unapproved Invoice Draft Template",
+    "file_path": "finance/drafts/invoice_template_draft.docx",
+    "content": "DRAFT INVOICE TEMPLATE - DO NOT PAY\nThis is an unapproved dummy draft template for internal testing only.\nNo money is owed or requested.",
+    "metadata": { "category": "draft", "language": "en" }
+  }
+]
