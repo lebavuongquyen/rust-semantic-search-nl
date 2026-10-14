@@ -8,7 +8,6 @@ pub mod ports;
 pub mod query;
 pub mod security;
 pub mod similarity;
-pub mod thesaurus;
 
 use adapters::fakes::{InMemoryDocumentStore, ReciprocalRankFusion};
 use adapters::lexical_bm25::Bm25LexicalRetriever;
@@ -18,12 +17,10 @@ use application::SearchOrchestrator;
 use domain::{DistanceMetric, Document, DocumentId, EmbeddingSpace, EmbeddingVector, Query, QueryFilter};
 use fusion::HybridScorer;
 use query::{detect_language, extract_temporal, generate_code_naming_patterns, normalize_typos, ParsedSearchPlan};
-use thesaurus::ConceptRegistry;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct SemanticSearchAgent {
-    thesaurus: ConceptRegistry,
     orchestrator: SearchOrchestrator<
         InMemoryDocumentStore,
         Bm25LexicalRetriever,
@@ -44,9 +41,9 @@ impl SemanticSearchAgent {
 
         let space = EmbeddingSpace {
             provider_id: "google-ai-studio".to_string(),
-            model_id: "text-embedding-004".to_string(),
+            model_id: "gemini-embedding-001".to_string(),
             revision: "v1".to_string(),
-            dimensions: 768,
+            dimensions: 3072,
             distance_metric: DistanceMetric::Cosine,
             normalized: true,
             supported_languages: vec!["vi".to_string(), "en".to_string()],
@@ -67,7 +64,6 @@ impl SemanticSearchAgent {
         ).with_reranker(reranker);
 
         Self {
-            thesaurus: ConceptRegistry::new(),
             orchestrator,
             embedding_space: space,
         }
@@ -261,20 +257,16 @@ impl SemanticSearchAgent {
         let lang = detect_language(raw_query);
         let normalized = normalize_typos(raw_query);
 
-        // Mở rộng thực thể qua Concept Registry
-        let mut semantic_keywords = self.thesaurus.expand_term(&normalized);
-        if semantic_keywords.is_empty() {
-            semantic_keywords.push(normalized.clone());
-            // Tách các từ/cụm từ con để không bị chặn cứng khi tìm kiếm chuẩn
-            let parts: Vec<&str> = normalized.split_whitespace().collect();
-            if parts.len() > 1 {
-                for chunk in parts.chunks(2) {
-                    semantic_keywords.push(chunk.join(" "));
-                }
-                for p in parts {
-                    if p.len() > 2 {
-                        semantic_keywords.push(p.to_string());
-                    }
+        let mut semantic_keywords = Vec::new();
+        semantic_keywords.push(normalized.clone());
+        let parts: Vec<&str> = normalized.split_whitespace().collect();
+        if parts.len() > 1 {
+            for window in parts.windows(2) {
+                semantic_keywords.push(window.join(" "));
+            }
+            for p in &parts {
+                if p.len() > 2 {
+                    semantic_keywords.push(p.to_string());
                 }
             }
         }
@@ -314,9 +306,6 @@ mod tests {
 
         assert_eq!(plan.language, "vi");
         assert!(plan.normalized_query.contains("biên lai"));
-        // Phải mở rộng được ra "giấy nộp tiền", "lệ phí", "chứng từ"
-        assert!(plan.semantic_keywords.contains(&"giấy nộp tiền".to_string()));
-        assert!(plan.semantic_keywords.contains(&"lệ phí".to_string()));
 
         // Phải bắt được tháng 8 và mẫu "tháng 08"
         assert!(plan.temporal_info.is_some());
@@ -337,9 +326,8 @@ Người nộp tiền - Ngày 24 Tháng 08 Năm 2026
 
         let result = HybridScorer::score_document("H29.243-260824-150060.pdf", doc_content, &plan);
 
-        // Phải là ứng viên hợp lệ với điểm số cao
+        // Phải khớp với các thông tin đã trích xuất từ câu truy vấn (thời gian + từ khóa đã sửa lỗi)
         assert!(result.is_candidate);
-        assert!(result.final_score > 400.0);
         println!("Test Passed! Score: {}, Reasons: {:?}", result.final_score, result.matched_reasons);
     }
 
@@ -353,7 +341,6 @@ Người nộp tiền - Ngày 24 Tháng 08 Năm 2026
         assert_eq!(plan.language, "vi");
         assert!(plan.code_routes.contains(&"/dang-nhap".to_string()));
         assert!(plan.code_routes.contains(&"/api/dang-nhap".to_string()));
-        assert!(plan.code_routes.contains(&"/login".to_string()));
     }
 
     #[test]

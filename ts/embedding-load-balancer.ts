@@ -22,45 +22,21 @@ export class LocalDeterministicEmbedder implements LocalEmbedder {
   ): Promise<readonly (readonly number[])[]> {
     return texts.map((text) => {
       const vec = new Array<number>(this.dimensions).fill(0);
-      const lower = text.toLowerCase();
+      const normalized = text.toLowerCase().trim();
+      if (!normalized) return vec;
 
-      // Semantic concept dispersion
-      const concepts: [string[], number][] = [
-        [
-          ["hóa đơn", "invoice", "bill", "billing", "dịch vụ", "wire transfer"],
-          0,
-        ],
-        [
-          ["biên lai", "receipt", "giấy nộp tiền", "thu phí", "lệ phí", "paid"],
-          64,
-        ],
-        [
-          ["hợp đồng", "contract", "agreement", "msa", "thỏa thuận", "signed"],
-          128,
-        ],
-        [["đăng nhập", "login", "auth", "jwt", "credentials", "password"], 192],
-        [
-          [
-            "tài liệu",
-            "hướng dẫn",
-            "guidelines",
-            "documentation",
-            "docs",
-            "architecture",
-          ],
-          256,
-        ],
-        [["tháng 8", "august", "2026", "2608"], 320],
-      ];
-
-      for (const [keywords, startDim] of concepts) {
-        for (const kw of keywords) {
-          if (lower.includes(kw)) {
-            for (let offset = 0; offset < 32; offset++) {
-              const idx = (startDim + offset) % this.dimensions;
-              vec[idx] += 1.25 / ((offset % 4) + 1);
-            }
+      // Pure mathematical deterministic n-gram hash projection (zero dictionary, zero word hardcoding)
+      const runes = Array.from(normalized);
+      for (let n = 1; n <= 3; n++) {
+        for (let i = 0; i <= runes.length - n; i++) {
+          const ngram = runes.slice(i, i + n).join("");
+          let hash = 2166136261;
+          for (let j = 0; j < ngram.length; j++) {
+            hash ^= ngram.charCodeAt(j);
+            hash = Math.imul(hash, 16777619);
           }
+          const dim = Math.abs(hash) % this.dimensions;
+          vec[dim] += 1.0 / n;
         }
       }
 

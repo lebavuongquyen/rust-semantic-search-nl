@@ -63,6 +63,16 @@ pub fn normalize_typos(query: &str) -> String {
     result
 }
 
+/// Loại bỏ dấu tiếng Việt để tạo slug không dấu (URL / Code Route friendly)
+pub fn strip_diacritics(s: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    s.nfd()
+        .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+        .collect::<String>()
+        .replace('đ', "d")
+        .replace('Đ', "D")
+}
+
 /// Trích xuất biểu thức thời gian đa ngôn ngữ sang chuẩn ISO Month (1-12) & Year
 pub fn extract_temporal(query: &str) -> Option<TemporalInfo> {
     let lower = query.to_lowercase();
@@ -142,9 +152,21 @@ pub fn generate_code_naming_patterns(terms: &[String]) -> (Vec<String>, Vec<Stri
         routes.push(format!("/{}", kebab));
         routes.push(format!("/api/{}", kebab));
 
+        // Unaccented slug
+        let unaccented = strip_diacritics(&clean).replace(' ', "-");
+        if unaccented != kebab {
+            file_patterns.push(format!("*{}*.*", unaccented));
+            routes.push(format!("/{}", unaccented));
+            routes.push(format!("/api/{}", unaccented));
+        }
+
         // Snake_case
         let snake = clean.replace(' ', "_");
         file_patterns.push(format!("*{}*.*", snake));
+        let unaccented_snake = strip_diacritics(&clean).replace(' ', "_");
+        if unaccented_snake != snake {
+            file_patterns.push(format!("*{}*.*", unaccented_snake));
+        }
 
         // CamelCase / PascalCase
         let words: Vec<&str> = clean.split_whitespace().collect();

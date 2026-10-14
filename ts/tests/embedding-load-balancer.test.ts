@@ -215,22 +215,29 @@ async function runTests() {
     }
   });
 
-  // 5. LocalDeterministicEmbedder cross-lingual check
-  await test("LocalDeterministicEmbedder produces valid cross-lingual alignment vectors", async () => {
+  // 5. LocalDeterministicEmbedder mathematical consistency check (Zero dictionary)
+  await test("LocalDeterministicEmbedder produces deterministic normalized vectors without dictionary", async () => {
     const local = new LocalDeterministicEmbedder(768);
-    const [vecVi, vecEn] = await local.embed(["tìm hóa đơn", "invoice bill"]);
+    const [vec1, vec2, vecOther] = await local.embed([
+      "search query document",
+      "search query document",
+      "completely different text",
+    ]);
 
-    let dot = 0,
-      nA = 0,
-      nB = 0;
-    for (let i = 0; i < 768; i++) {
-      dot += vecVi[i] * vecEn[i];
-      nA += vecVi[i] * vecVi[i];
-      nB += vecEn[i] * vecEn[i];
+    if (vec1.length !== 768) throw new Error("Incorrect dimensions");
+
+    // Identical texts produce identical vectors
+    let dotSame = 0;
+    for (let i = 0; i < 768; i++) dotSame += vec1[i] * vec2[i];
+    if (Math.abs(dotSame - 1.0) > 1e-4) {
+      throw new Error(`Expected identical text cosine ~ 1.0, got ${dotSame}`);
     }
-    const cosine = dot / (Math.sqrt(nA) * Math.sqrt(nB));
-    if (cosine < 0.7) {
-      throw new Error(`Expected cross-lingual cosine >= 0.70, got ${cosine}`);
+
+    // Distinct texts produce lower cosine
+    let dotDiff = 0;
+    for (let i = 0; i < 768; i++) dotDiff += vec1[i] * vecOther[i];
+    if (dotDiff > 0.8) {
+      throw new Error(`Expected distinct text cosine < 0.8, got ${dotDiff}`);
     }
   });
 
