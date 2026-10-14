@@ -5,6 +5,18 @@ All notable changes to the SemanticSearchAgent project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-14
+
+### Removed
+- **Hardcoded Thesaurus & Dictionary Removal**: Completely deleted legacy `src/thesaurus/mod.rs` and `ConceptRegistry` lookup table from the codebase in strict accordance with the non-negotiable architectural rule against hardcoded synonym/translation dictionaries.
+
+### Changed
+- **Mathematical Local Embedder**: Replaced hardcoded dictionary concepts in `LocalDeterministicEmbedder` with pure mathematical FNV-1a character n-gram polynomial hashing, ensuring 100% dictionary-free offline vector generation.
+
+### Added
+- **Zero-AI Pure Offline Local Mode**: Supported initializing `new SemanticSearchCoordinator()` without any arguments, AI provider, or API key. Operates entirely locally with pure mathematical fallback embeddings and BM25 lexical retrieval.
+- **Granular Step-Level Fallback**: Preserved and verified step-level fault tolerance in `EmbeddingLoadBalancer` where temporary AI quota limits (429) or remote outages fail over to secondary model slots and cleanly fall back to local embeddings for the specific failed batch without aborting the broader search pipeline.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "semantic-search-agent",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Cross-lingual semantic search agent with Rust WASM core and Google AI Studio load balanced embeddings",
   "private": true,
   "scripts": {
