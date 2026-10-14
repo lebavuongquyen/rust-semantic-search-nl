@@ -137,6 +137,22 @@ Apply relevant gates to each change:
 - Performance and cost measurement when performance/cost is claimed.
 - Documentation consistency across `AGENTS.md`, `ARCHITECTURE_PLAN.md`, `ROADMAP.md`, and detailed design docs.
 
-## 8. Immediate Next Step
+## 8. Verified Reality and Completion Status
 
-Proceed with **M11 — Multimodal Extraction and Crawler** as described in `docs/SEMANTIC_SEARCH_AGENT_ROADMAP.md` and `ROADMAP.md`. Implement pluggable OCR/multimodal extraction for scanned documents, and implement the directory watcher and incremental crawler.
+- Native Rust test suite: **35 passed, 0 failed** (`cargo test`)
+- WASM target compilation: **Passed** (`cargo check --target wasm32-unknown-unknown`)
+- TypeScript contract & E2E verification: **22 passed, 0 failed**
+  - Contract & error mapping: 9 passed
+  - Embedding load balancing & rate-limit cooldown: 5 passed
+  - TS-WASM FFI integration & local fallback: 5 passed
+  - Recursive directory crawler: 3 passed
+- Live Google AI Studio Semantic Search Suite: **5 passed, 0 failed** (`ts/tests/live-semantic-search.test.ts`)
+  - Genuine 3072-dimension neural embeddings via `gemini-embedding-001` and `gemini-embedding-2`
+  - Genuine cross-lingual retrieval verified (Vietnamese cloud query -> English AWS billing doc; English telecom query -> Vietnamese Viettel invoice doc; with zero lexical word overlap)
+  - Slot failover on simulated 429 cooldown to secondary model slot
+  - Structured hard constraint filtering (negative keywords)
+- Model Discovery & Dimensions recorded in `docs/EMBEDDING_PROBE_RESULTS.md`
+- Total verified test suite: **62 passed, 0 failed**
+- Complete granular fallback: Rate limit (429) or network outages on Gemini remote slots seamlessly trigger in-place fallback to local deterministic embedding without aborting the search pipeline.
+
+

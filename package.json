@@ -1,0 +1,23 @@
+{
+  "name": "semantic-search-agent",
+  "version": "0.2.0",
+  "description": "Cross-lingual semantic search agent with Rust WASM core and Google AI Studio load balanced embeddings",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:rust && npm run test:ts",
+    "test:rust": "cargo test",
+    "test:ts": "npx --yes tsx ts/tests/provider-contract.test.ts && npx --yes tsx ts/tests/embedding-load-balancer.test.ts && npx --yes tsx ts/tests/e2e-coordinator.test.ts && npx --yes tsx ts/tests/directory-crawler.test.ts",
+    "test:live": "npx --yes tsx ts/tests/live-semantic-search.test.ts",
+    "typecheck": "npx --yes --package typescript tsc --noEmit",
+    "format": "npx --yes prettier --write \"ts/**/*.ts\" \"package.json\"",
+    "format:check": "npx --yes prettier --check \"ts/**/*.ts\" \"package.json\"",
+    "probe": "npx --yes tsx ts/scripts/probe-embedding-dims.ts",
+    "build:wasm": "cargo build --target wasm32-unknown-unknown --release && wasm-bindgen --target nodejs --out-dir pkg target/wasm32-unknown-unknown/release/semantic_search_agent.wasm"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

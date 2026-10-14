@@ -6,6 +6,7 @@ pub mod neural_embedder;
 pub mod query_analyzer;
 pub mod reranker;
 pub mod semantic_embedder;
+pub mod text_extractor;
 pub mod vector_index;
 
 

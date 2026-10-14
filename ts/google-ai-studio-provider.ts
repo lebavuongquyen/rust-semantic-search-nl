@@ -49,12 +49,16 @@ export class GoogleAiStudioProvider implements AiProvider {
     if (!options.apiKey.trim()) {
       throw new Error("Google AI Studio API key must not be empty");
     }
-    this.baseUrl = (options.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
+    this.baseUrl = (
+      options.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta"
+    ).replace(/\/$/, "");
     this.fetcher = options.fetchImplementation ?? fetch;
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 15000;
   }
 
-  async listModels(options?: { signal?: AbortSignal }): Promise<readonly AiModelDescriptor[]> {
+  async listModels(options?: {
+    signal?: AbortSignal;
+  }): Promise<readonly AiModelDescriptor[]> {
     const payload = await this.request<GoogleModelListResponse>("/models", {
       method: "GET",
       signal: options?.signal,
@@ -63,28 +67,39 @@ export class GoogleAiStudioProvider implements AiProvider {
       if (!model.name) return [];
       const id = model.name.replace(/^models\//, "");
       const methods = new Set(model.supportedGenerationMethods ?? []);
-      const capabilities = new Set<AiModelDescriptor["capabilities"] extends ReadonlySet<infer C> ? C : never>();
+      const capabilities = new Set<
+        AiModelDescriptor["capabilities"] extends ReadonlySet<infer C>
+          ? C
+          : never
+      >();
       if (methods.has("generateContent")) {
         capabilities.add("text_generation");
         capabilities.add("structured_output");
-
       }
       if (methods.has("embedContent") || methods.has("batchEmbedContents")) {
         capabilities.add("text_embedding");
       }
-      return [{
-        id,
-        providerId: this.id,
-        displayName: model.displayName ?? id,
-        capabilities,
-        contextWindow: model.inputTokenLimit,
-        maxOutputTokens: model.outputTokenLimit,
-        metadata: { description: model.description ?? "", methods: [...methods].join(",") },
-      }];
+      return [
+        {
+          id,
+          providerId: this.id,
+          displayName: model.displayName ?? id,
+          capabilities,
+          contextWindow: model.inputTokenLimit,
+          maxOutputTokens: model.outputTokenLimit,
+          metadata: {
+            description: model.description ?? "",
+            methods: [...methods].join(","),
+          },
+        },
+      ];
     });
   }
 
-  async describeModel(modelId: string, options?: { signal?: AbortSignal }): Promise<AiModelDescriptor | undefined> {
+  async describeModel(
+    modelId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<AiModelDescriptor | undefined> {
     try {
       const models = await this.listModels(options);
       const found = models.find((model) => model.id === modelId);
@@ -115,23 +130,33 @@ export class GoogleAiStudioProvider implements AiProvider {
       .map((message) => message.content)
       .join("\n\n");
     const generationConfig: Record<string, unknown> = {};
-    if (request.options?.temperature !== undefined) generationConfig.temperature = request.options.temperature;
-    if (request.options?.maxOutputTokens !== undefined) generationConfig.maxOutputTokens = request.options.maxOutputTokens;
+    if (request.options?.temperature !== undefined)
+      generationConfig.temperature = request.options.temperature;
+    if (request.options?.maxOutputTokens !== undefined)
+      generationConfig.maxOutputTokens = request.options.maxOutputTokens;
     if (request.options?.responseFormat === "json") {
       generationConfig.responseMimeType = "application/json";
     }
 
-    const payload = await this.request<GoogleGenerateResponse>(`/models/${encodeURIComponent(request.model)}:generateContent`, {
-      method: "POST",
-      signal: request.options?.signal,
-      timeoutMs: request.options?.timeoutMs,
-      body: {
-        contents,
-        ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
-        ...(Object.keys(generationConfig).length ? { generationConfig } : {}),
+    const payload = await this.request<GoogleGenerateResponse>(
+      `/models/${encodeURIComponent(request.model)}:generateContent`,
+      {
+        method: "POST",
+        signal: request.options?.signal,
+        timeoutMs: request.options?.timeoutMs,
+        body: {
+          contents,
+          ...(systemText
+            ? { systemInstruction: { parts: [{ text: systemText }] } }
+            : {}),
+          ...(Object.keys(generationConfig).length ? { generationConfig } : {}),
+        },
       },
-    });
-    const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+    );
+    const text =
+      payload.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text ?? "")
+        .join("") ?? "";
     if (!text) {
       throw new AiProviderError({
         message: "Google AI Studio returned no text candidate",
@@ -144,11 +169,13 @@ export class GoogleAiStudioProvider implements AiProvider {
       model: request.model,
       text,
       finishReason: payload.candidates?.[0]?.finishReason,
-      usage: payload.usageMetadata ? {
-        inputTokens: payload.usageMetadata.promptTokenCount,
-        outputTokens: payload.usageMetadata.candidatesTokenCount,
-        totalTokens: payload.usageMetadata.totalTokenCount,
-      } : undefined,
+      usage: payload.usageMetadata
+        ? {
+            inputTokens: payload.usageMetadata.promptTokenCount,
+            outputTokens: payload.usageMetadata.candidatesTokenCount,
+            totalTokens: payload.usageMetadata.totalTokenCount,
+          }
+        : undefined,
     };
   }
 
@@ -186,7 +213,12 @@ export class GoogleAiStudioProvider implements AiProvider {
 
   private async request<T>(
     path: string,
-    init: { method: "GET" | "POST"; body?: unknown; signal?: AbortSignal; timeoutMs?: number },
+    init: {
+      method: "GET" | "POST";
+      body?: unknown;
+      signal?: AbortSignal;
+      timeoutMs?: number;
+    },
   ): Promise<T> {
     const controller = new AbortController();
     const timeoutMs = init.timeoutMs ?? this.defaultTimeoutMs;
@@ -203,7 +235,10 @@ export class GoogleAiStudioProvider implements AiProvider {
         `${this.baseUrl}${path}?key=${encodeURIComponent(this.options.apiKey)}`,
         {
           method: init.method,
-          headers: init.body === undefined ? undefined : { "Content-Type": "application/json" },
+          headers:
+            init.body === undefined
+              ? undefined
+              : { "Content-Type": "application/json" },
           body: init.body === undefined ? undefined : JSON.stringify(init.body),
           signal: controller.signal,
         },
@@ -217,16 +252,21 @@ export class GoogleAiStudioProvider implements AiProvider {
           code,
           providerId: this.id,
           statusCode: response.status,
-          retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+          retryable:
+            response.status === 408 ||
+            response.status === 429 ||
+            response.status >= 500,
           requestId,
         });
       }
-      return await response.json() as T;
+      return (await response.json()) as T;
     } catch (error) {
       if (error instanceof AiProviderError) throw error;
       const timedOut = controller.signal.aborted;
       throw new AiProviderError({
-        message: timedOut ? `Google AI Studio request timed out after ${timeoutMs}ms` : "Google AI Studio network request failed",
+        message: timedOut
+          ? `Google AI Studio request timed out after ${timeoutMs}ms`
+          : "Google AI Studio network request failed",
         code: timedOut ? "TIMEOUT" : "NETWORK",
         providerId: this.id,
         retryable: true,
@@ -241,9 +281,13 @@ export class GoogleAiStudioProvider implements AiProvider {
   private mapError(status: number, body: string): AiProviderError["code"] {
     if (status === 400) return "INVALID_REQUEST";
     if (status === 401) return "AUTHENTICATION";
-    if (status === 403) return /quota|rate limit/i.test(body) ? "QUOTA_EXCEEDED" : "PERMISSION_DENIED";
+    if (status === 403)
+      return /quota|rate limit/i.test(body)
+        ? "QUOTA_EXCEEDED"
+        : "PERMISSION_DENIED";
     if (status === 404) return "MODEL_NOT_FOUND";
-    if (status === 429) return /quota/i.test(body) ? "QUOTA_EXCEEDED" : "RATE_LIMITED";
+    if (status === 429)
+      return /quota/i.test(body) ? "QUOTA_EXCEEDED" : "RATE_LIMITED";
     if (status >= 500) return "PROVIDER_UNAVAILABLE";
     return "UNKNOWN";
   }

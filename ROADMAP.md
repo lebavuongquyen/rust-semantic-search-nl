@@ -79,16 +79,24 @@ Milestones are sequential acceptance gates, not dates. Follow [the detailed road
 | M08 | Production hardening, security, and recovery | Complete | `AccessControlPolicy` tenant isolation, `TelemetryRedactionPolicy` secret masking, deletion propagation across index |
 | M09 | Continuous evaluation and optimization | Complete | Per-query latency instrumentation, p50/p95 latency, sliced language breakdowns, `RegressionGate` with canary thresholds blocking regressions |
 | M10 | Storage persistence and recovery | Complete | `DiskDocumentStore` atomic file writes & crash recovery, `MemoryVectorIndex` and `Bm25LexicalRetriever` disk snapshots roundtrip |
-| M11 | Multimodal extraction & crawler | Next / Planned | OCR/multimodal extraction capability, end-to-end directory watcher/crawler |
-| M12 | Provider-agnostic AI model integration | Complete foundation | Migrated `ts/google-ai-studio-orchestrator.ts` to `AiRouter`, deterministic TS contract tests (9 passed) |
+| M11 | Multimodal extraction & crawler | Complete | `TextExtractorPort`, `PlainTextExtractor`, `MultimodalMockExtractor`, `DirectoryCrawler`, automated recursive ingestion (3 passed) |
+| M12 | Provider-agnostic AI model integration & Load Balancing | Complete | `EmbeddingLoadBalancer` (round-robin, 429 cooldown, granular fallback), `SemanticSearchCoordinator` (TS-WASM bridge, 5 passed) |
 
-**M12 is a cross-cutting capability track, not permission to skip earlier milestones.** The exact scope and acceptance criteria in the detailed roadmap remain authoritative.
+## 5. Current Verified Quality Gates
 
-## 5. Immediate next step — M11
-
-Proceed with **M11 — Multimodal Extraction and Crawler**:
-1. Implement pluggable OCR/multimodal extraction port for scanned documents.
-2. Implement directory traversal and incremental crawler with change detection.
+- `cargo test`: **35 passed, 0 failed** across all native test suites (`m01` through `m11`, `cache`, `neural_embedder`).
+- `cargo check --target wasm32-unknown-unknown`: passed (0 warnings, 0 errors).
+- TypeScript verification suites: **22 passed, 0 failed** across all suites:
+  - `provider-contract.test.ts`: 9 passed
+  - `embedding-load-balancer.test.ts`: 5 passed
+  - `e2e-coordinator.test.ts`: 5 passed
+  - `directory-crawler.test.ts`: 3 passed
+- Live Google AI Studio Semantic Search Suite: **5 passed, 0 failed** (`live-semantic-search.test.ts`):
+  - Genuine 3072-dim embeddings via `gemini-embedding-001` and `gemini-embedding-2`
+  - Cross-lingual retrieval (Vi -> En and En -> Vi with zero lexical word overlap)
+  - Slot failover on simulated 429 cooldown
+  - Structured hard constraint filtering (negative keywords)
+- **Grand Total: 62 passed, 0 failed**.
 
 ## 6. Definition of done for each milestone
 

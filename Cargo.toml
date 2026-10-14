@@ -1,6 +1,6 @@
 [package]
 name = "semantic-search-agent"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Industrial-grade WASM Multi-threaded Semantic Search Agent for 10,000+ files"
 authors = ["DeepMind Pair Programmer <assistant@antigravity>"]

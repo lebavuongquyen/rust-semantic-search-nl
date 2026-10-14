@@ -1,11 +1,11 @@
 /**
  * Google AI Studio Integration for SemanticSearchAgent (Migrated to Provider-Neutral Architecture)
- * 
+ *
  * Supports Free-tier quota models:
  * - gemini-2.0-flash (Recommended default)
  * - gemini-1.5-flash
  * - gemini-1.5-flash-8b
- * 
+ *
  * Configurable Fallback Policy:
  * - 'fallback_to_standard': If API call fails (429 Quota, network, 401, timeout), automatically fall back to local WASM engine
  * - 'strict_fail': If API call fails, immediately reject/return FAILED status with detailed HTTP/error code telemetry
@@ -18,12 +18,12 @@ import {
 } from "./ai-provider-contract";
 import { GoogleAiStudioProvider } from "./google-ai-studio-provider";
 
-export type FallbackPolicy = 'fallback_to_standard' | 'strict_fail';
+export type FallbackPolicy = "fallback_to_standard" | "strict_fail";
 
 export type GoogleAiStudioModel =
-  | 'gemini-2.0-flash'
-  | 'gemini-1.5-flash'
-  | 'gemini-1.5-flash-8b'
+  | "gemini-2.0-flash"
+  | "gemini-1.5-flash"
+  | "gemini-1.5-flash-8b"
   | (string & {});
 
 export interface GoogleAiStudioConfig {
@@ -37,14 +37,14 @@ export interface GoogleAiStudioConfig {
 export interface ApiDiagnostic {
   attempted: boolean;
   modelUsed?: string;
-  statusCode?: number;        // e.g. 429 (Too Many Requests), 401, 503
-  errorCode?: string;         // 'QUOTA_EXCEEDED' | 'UNAUTHORIZED' | 'TIMEOUT' | 'NETWORK_ERROR' | 'UNKNOWN'
+  statusCode?: number; // e.g. 429 (Too Many Requests), 401, 503
+  errorCode?: string; // 'QUOTA_EXCEEDED' | 'UNAUTHORIZED' | 'TIMEOUT' | 'NETWORK_ERROR' | 'UNKNOWN'
   errorMessage?: string;
   durationMs?: number;
 }
 
 export interface ParsedSearchPlan {
-  provider: 'gemini' | 'standard_fallback' | 'standard_pure';
+  provider: "gemini" | "standard_fallback" | "standard_pure";
   raw_query: string;
   language: string;
   normalized_query: string;
@@ -63,14 +63,16 @@ export interface ParsedSearchPlan {
 type VecString = string[];
 
 export interface SearchPlanEnvelope {
-  status: 'SUCCESS' | 'FAILED';
+  status: "SUCCESS" | "FAILED";
   plan?: ParsedSearchPlan;
   diagnostic: ApiDiagnostic;
   error?: string;
 }
 
 export class GoogleAiStudioSearchOrchestrator {
-  private config: Required<Omit<GoogleAiStudioConfig, "fetchImplementation">> & {
+  private config: Required<
+    Omit<GoogleAiStudioConfig, "fetchImplementation">
+  > & {
     fetchImplementation?: typeof fetch;
   };
   private router: AiRouter;
@@ -78,20 +80,20 @@ export class GoogleAiStudioSearchOrchestrator {
   constructor(config: GoogleAiStudioConfig) {
     this.config = {
       apiKey: config.apiKey,
-      model: config.model || 'gemini-2.0-flash',
-      fallbackPolicy: config.fallbackPolicy || 'fallback_to_standard',
+      model: config.model || "gemini-2.0-flash",
+      fallbackPolicy: config.fallbackPolicy || "fallback_to_standard",
       timeoutMs: config.timeoutMs || 4000,
       fetchImplementation: config.fetchImplementation,
     };
 
     const registry = new AiProviderRegistry();
-    if (this.config.apiKey && this.config.apiKey.trim() !== '') {
+    if (this.config.apiKey && this.config.apiKey.trim() !== "") {
       registry.register(
         new GoogleAiStudioProvider({
           apiKey: this.config.apiKey,
           fetchImplementation: this.config.fetchImplementation,
           defaultTimeoutMs: this.config.timeoutMs,
-        })
+        }),
       );
     }
     this.router = new AiRouter(registry, { allowFallback: false });
@@ -102,16 +104,16 @@ export class GoogleAiStudioSearchOrchestrator {
    */
   async generateSearchPlan(
     query: string,
-    standardFallbackFn: (query: string) => ParsedSearchPlan
+    standardFallbackFn: (query: string) => ParsedSearchPlan,
   ): Promise<SearchPlanEnvelope> {
     const startTime = Date.now();
 
     // 1. Nếu không có API Key, chạy luôn workflow chuẩn
-    if (!this.config.apiKey || this.config.apiKey.trim() === '') {
+    if (!this.config.apiKey || this.config.apiKey.trim() === "") {
       const plan = standardFallbackFn(query);
-      plan.provider = 'standard_pure';
+      plan.provider = "standard_pure";
       return {
-        status: 'SUCCESS',
+        status: "SUCCESS",
         plan,
         diagnostic: {
           attempted: false,
@@ -124,7 +126,7 @@ export class GoogleAiStudioSearchOrchestrator {
     try {
       const planFromGemini = await this.callGeminiApi(query);
       return {
-        status: 'SUCCESS',
+        status: "SUCCESS",
         plan: planFromGemini,
         diagnostic: {
           attempted: true,
@@ -136,16 +138,29 @@ export class GoogleAiStudioSearchOrchestrator {
     } catch (err: any) {
       const durationMs = Date.now() - startTime;
       const statusCode = err.statusCode || 500;
-      let errorCode = err.code || 'UNKNOWN';
+      let errorCode = err.code || "UNKNOWN";
 
-      if (statusCode === 429 || errorCode === 'QUOTA_EXCEEDED') {
-        errorCode = 'QUOTA_EXCEEDED';
-      } else if (statusCode === 401 || statusCode === 403 || errorCode === 'AUTHENTICATION' || errorCode === 'PERMISSION_DENIED') {
-        errorCode = 'UNAUTHORIZED';
-      } else if (err.name === 'AbortError' || err.message?.includes('timeout') || errorCode === 'TIMEOUT') {
-        errorCode = 'TIMEOUT';
-      } else if (err.message?.includes('network') || err.message?.includes('fetch failed') || errorCode === 'NETWORK') {
-        errorCode = 'NETWORK_ERROR';
+      if (statusCode === 429 || errorCode === "QUOTA_EXCEEDED") {
+        errorCode = "QUOTA_EXCEEDED";
+      } else if (
+        statusCode === 401 ||
+        statusCode === 403 ||
+        errorCode === "AUTHENTICATION" ||
+        errorCode === "PERMISSION_DENIED"
+      ) {
+        errorCode = "UNAUTHORIZED";
+      } else if (
+        err.name === "AbortError" ||
+        err.message?.includes("timeout") ||
+        errorCode === "TIMEOUT"
+      ) {
+        errorCode = "TIMEOUT";
+      } else if (
+        err.message?.includes("network") ||
+        err.message?.includes("fetch failed") ||
+        errorCode === "NETWORK"
+      ) {
+        errorCode = "NETWORK_ERROR";
       }
 
       const diagnostic: ApiDiagnostic = {
@@ -158,9 +173,9 @@ export class GoogleAiStudioSearchOrchestrator {
       };
 
       // 3. Xử lý theo Chính sách Fallback đã chọn
-      if (this.config.fallbackPolicy === 'strict_fail') {
+      if (this.config.fallbackPolicy === "strict_fail") {
         return {
-          status: 'FAILED',
+          status: "FAILED",
           diagnostic,
           error: `Google AI Studio API failed with status ${statusCode} (${errorCode}): ${err.message}`,
         };
@@ -168,10 +183,10 @@ export class GoogleAiStudioSearchOrchestrator {
 
       // Default: 'fallback_to_standard'
       const fallbackPlan = standardFallbackFn(query);
-      fallbackPlan.provider = 'standard_fallback';
+      fallbackPlan.provider = "standard_fallback";
 
       return {
-        status: 'SUCCESS',
+        status: "SUCCESS",
         plan: fallbackPlan,
         diagnostic,
       };
@@ -218,23 +233,34 @@ Output MUST be strict JSON only matching this format:
           temperature: 0.1,
           timeoutMs: this.config.timeoutMs,
         },
-      }
+      },
     );
 
     const parsed = JSON.parse(response.text);
 
     // Validate plan schema
     return {
-      provider: 'gemini',
+      provider: "gemini",
       raw_query: query,
-      language: typeof parsed.language === 'string' ? parsed.language : 'en',
-      normalized_query: typeof parsed.normalized_query === 'string' ? parsed.normalized_query : query,
-      semantic_keywords: Array.isArray(parsed.semantic_keywords) ? parsed.semantic_keywords : [],
-      name_patterns: Array.isArray(parsed.name_patterns) ? parsed.name_patterns : [],
+      language: typeof parsed.language === "string" ? parsed.language : "en",
+      normalized_query:
+        typeof parsed.normalized_query === "string"
+          ? parsed.normalized_query
+          : query,
+      semantic_keywords: Array.isArray(parsed.semantic_keywords)
+        ? parsed.semantic_keywords
+        : [],
+      name_patterns: Array.isArray(parsed.name_patterns)
+        ? parsed.name_patterns
+        : [],
       code_routes: Array.isArray(parsed.code_routes) ? parsed.code_routes : [],
       temporal_info: parsed.temporal_info || null,
-      target_extensions: Array.isArray(parsed.target_extensions) ? parsed.target_extensions : [],
-      negative_keywords: Array.isArray(parsed.negative_keywords) ? parsed.negative_keywords : [],
+      target_extensions: Array.isArray(parsed.target_extensions)
+        ? parsed.target_extensions
+        : [],
+      negative_keywords: Array.isArray(parsed.negative_keywords)
+        ? parsed.negative_keywords
+        : [],
     };
   }
 }

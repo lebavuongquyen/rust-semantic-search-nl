@@ -4,7 +4,10 @@ import {
   AiProviderRegistry,
   AiRouter,
 } from "../ai-provider-contract";
-import { GoogleAiStudioSearchOrchestrator, ParsedSearchPlan } from "../google-ai-studio-orchestrator";
+import {
+  GoogleAiStudioSearchOrchestrator,
+  ParsedSearchPlan,
+} from "../google-ai-studio-orchestrator";
 
 declare const process: any;
 
@@ -75,10 +78,16 @@ async function runTests() {
       negative_keywords: [],
     });
 
-    const envelope = await orchestrator.generateSearchPlan("tìm hóa đơn", fallbackFn);
-    if (envelope.status !== "SUCCESS") throw new Error("Expected status SUCCESS");
-    if (envelope.plan?.provider !== "standard_pure") throw new Error("Expected provider standard_pure");
-    if (envelope.diagnostic.attempted !== false) throw new Error("Expected attempted=false");
+    const envelope = await orchestrator.generateSearchPlan(
+      "tìm hóa đơn",
+      fallbackFn,
+    );
+    if (envelope.status !== "SUCCESS")
+      throw new Error("Expected status SUCCESS");
+    if (envelope.plan?.provider !== "standard_pure")
+      throw new Error("Expected provider standard_pure");
+    if (envelope.diagnostic.attempted !== false)
+      throw new Error("Expected attempted=false");
   });
 
   // 3. Orchestrator fallback on API error (e.g. 429 quota)
@@ -109,11 +118,18 @@ async function runTests() {
       negative_keywords: [],
     });
 
-    const envelope = await orchestrator.generateSearchPlan("test query", fallbackFn);
-    if (envelope.status !== "SUCCESS") throw new Error("Expected status SUCCESS");
-    if (envelope.plan?.provider !== "standard_fallback") throw new Error("Expected provider standard_fallback");
+    const envelope = await orchestrator.generateSearchPlan(
+      "test query",
+      fallbackFn,
+    );
+    if (envelope.status !== "SUCCESS")
+      throw new Error("Expected status SUCCESS");
+    if (envelope.plan?.provider !== "standard_fallback")
+      throw new Error("Expected provider standard_fallback");
     if (envelope.diagnostic.errorCode !== "QUOTA_EXCEEDED") {
-      throw new Error(`Expected QUOTA_EXCEEDED, got ${envelope.diagnostic.errorCode}`);
+      throw new Error(
+        `Expected QUOTA_EXCEEDED, got ${envelope.diagnostic.errorCode}`,
+      );
     }
   });
 
@@ -135,7 +151,9 @@ async function runTests() {
 
     if (envelope.status !== "FAILED") throw new Error("Expected status FAILED");
     if (envelope.diagnostic.errorCode !== "UNAUTHORIZED") {
-      throw new Error(`Expected UNAUTHORIZED, got ${envelope.diagnostic.errorCode}`);
+      throw new Error(
+        `Expected UNAUTHORIZED, got ${envelope.diagnostic.errorCode}`,
+      );
     }
   });
 
@@ -162,7 +180,7 @@ async function runTests() {
             },
           ],
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     };
 
@@ -171,12 +189,17 @@ async function runTests() {
       fetchImplementation: mockFetcher,
     });
 
-    const envelope = await orchestrator.generateSearchPlan("tìm hóa đơn", () => {
-      throw new Error("Fallback should not be called");
-    });
+    const envelope = await orchestrator.generateSearchPlan(
+      "tìm hóa đơn",
+      () => {
+        throw new Error("Fallback should not be called");
+      },
+    );
 
-    if (envelope.status !== "SUCCESS") throw new Error("Expected status SUCCESS");
-    if (envelope.plan?.provider !== "gemini") throw new Error("Expected provider gemini");
+    if (envelope.status !== "SUCCESS")
+      throw new Error("Expected status SUCCESS");
+    if (envelope.plan?.provider !== "gemini")
+      throw new Error("Expected provider gemini");
     if (!envelope.plan?.semantic_keywords.includes("invoice")) {
       throw new Error("Expected semantic keywords to include invoice");
     }
@@ -184,18 +207,30 @@ async function runTests() {
 
   // 6. Direct GoogleAiStudioProvider contract test: Authentication error (401)
   await test("GoogleAiStudioProvider maps 401 response to AUTHENTICATION error code", async () => {
-    const { GoogleAiStudioProvider } = await import("../google-ai-studio-provider");
+    const { GoogleAiStudioProvider } =
+      await import("../google-ai-studio-provider");
     const mockFetcher: typeof fetch = async () => {
-      return new Response(JSON.stringify({ error: { message: "API key invalid" } }), { status: 401 });
+      return new Response(
+        JSON.stringify({ error: { message: "API key invalid" } }),
+        { status: 401 },
+      );
     };
-    const provider = new GoogleAiStudioProvider({ apiKey: "bad-key", fetchImplementation: mockFetcher });
+    const provider = new GoogleAiStudioProvider({
+      apiKey: "bad-key",
+      fetchImplementation: mockFetcher,
+    });
     let threw = false;
     try {
-      await provider.generate({ model: "gemini-2.0-flash", messages: [{ role: "user", content: "test" }] });
+      await provider.generate({
+        model: "gemini-2.0-flash",
+        messages: [{ role: "user", content: "test" }],
+      });
     } catch (e: any) {
       threw = true;
-      if (e.code !== "AUTHENTICATION") throw new Error(`Expected AUTHENTICATION, got ${e.code}`);
-      if (e.statusCode !== 401) throw new Error(`Expected 401, got ${e.statusCode}`);
+      if (e.code !== "AUTHENTICATION")
+        throw new Error(`Expected AUTHENTICATION, got ${e.code}`);
+      if (e.statusCode !== 401)
+        throw new Error(`Expected 401, got ${e.statusCode}`);
       if (e.retryable !== false) throw new Error("401 must not be retryable");
     }
     if (!threw) throw new Error("Expected 401 to throw");
@@ -203,17 +238,25 @@ async function runTests() {
 
   // 7. Direct GoogleAiStudioProvider contract test: Rate limit / Quota error (429)
   await test("GoogleAiStudioProvider maps 429 rate limit to RATE_LIMITED or QUOTA_EXCEEDED with retryable=true", async () => {
-    const { GoogleAiStudioProvider } = await import("../google-ai-studio-provider");
+    const { GoogleAiStudioProvider } =
+      await import("../google-ai-studio-provider");
     const mockFetcher: typeof fetch = async () => {
       return new Response("Too Many Requests", { status: 429 });
     };
-    const provider = new GoogleAiStudioProvider({ apiKey: "test-key", fetchImplementation: mockFetcher });
+    const provider = new GoogleAiStudioProvider({
+      apiKey: "test-key",
+      fetchImplementation: mockFetcher,
+    });
     let threw = false;
     try {
-      await provider.generate({ model: "gemini-2.0-flash", messages: [{ role: "user", content: "test" }] });
+      await provider.generate({
+        model: "gemini-2.0-flash",
+        messages: [{ role: "user", content: "test" }],
+      });
     } catch (e: any) {
       threw = true;
-      if (e.code !== "RATE_LIMITED" && e.code !== "QUOTA_EXCEEDED") throw new Error(`Unexpected code: ${e.code}`);
+      if (e.code !== "RATE_LIMITED" && e.code !== "QUOTA_EXCEEDED")
+        throw new Error(`Unexpected code: ${e.code}`);
       if (e.retryable !== true) throw new Error("429 must be retryable");
     }
     if (!threw) throw new Error("Expected 429 to throw");
@@ -221,24 +264,36 @@ async function runTests() {
 
   // 8. Direct GoogleAiStudioProvider contract test: Embedding invalid vector validation
   await test("GoogleAiStudioProvider rejects malformed embedding vector containing NaN", async () => {
-    const { GoogleAiStudioProvider } = await import("../google-ai-studio-provider");
+    const { GoogleAiStudioProvider } =
+      await import("../google-ai-studio-provider");
     const mockFetcher: typeof fetch = async () => {
-      return new Response(JSON.stringify({ embedding: { values: [0.1, null, 0.3] } }), { status: 200 });
+      return new Response(
+        JSON.stringify({ embedding: { values: [0.1, null, 0.3] } }),
+        { status: 200 },
+      );
     };
-    const provider = new GoogleAiStudioProvider({ apiKey: "test-key", fetchImplementation: mockFetcher });
+    const provider = new GoogleAiStudioProvider({
+      apiKey: "test-key",
+      fetchImplementation: mockFetcher,
+    });
     let threw = false;
     try {
-      await provider.embed({ model: "text-embedding-004", inputs: ["test text"] });
+      await provider.embed({
+        model: "text-embedding-004",
+        inputs: ["test text"],
+      });
     } catch (e: any) {
       threw = true;
-      if (e.code !== "INVALID_RESPONSE") throw new Error(`Expected INVALID_RESPONSE, got ${e.code}`);
+      if (e.code !== "INVALID_RESPONSE")
+        throw new Error(`Expected INVALID_RESPONSE, got ${e.code}`);
     }
     if (!threw) throw new Error("Expected invalid embedding to throw");
   });
 
   // 9. Direct GoogleAiStudioProvider contract test: AbortSignal / Timeout handling
   await test("GoogleAiStudioProvider respects AbortSignal and marks error as TIMEOUT/NETWORK", async () => {
-    const { GoogleAiStudioProvider } = await import("../google-ai-studio-provider");
+    const { GoogleAiStudioProvider } =
+      await import("../google-ai-studio-provider");
     const controller = new AbortController();
     controller.abort(); // already aborted
 
@@ -252,7 +307,8 @@ async function runTests() {
       });
     } catch (e: any) {
       threw = true;
-      if (e.code !== "TIMEOUT" && e.code !== "NETWORK") throw new Error(`Expected TIMEOUT or NETWORK, got ${e.code}`);
+      if (e.code !== "TIMEOUT" && e.code !== "NETWORK")
+        throw new Error(`Expected TIMEOUT or NETWORK, got ${e.code}`);
     }
     if (!threw) throw new Error("Expected aborted request to throw");
   });

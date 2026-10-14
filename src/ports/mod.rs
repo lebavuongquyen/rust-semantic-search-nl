@@ -104,3 +104,24 @@ impl RerankerPort for NoopReranker {
         Ok(candidates)
     }
 }
+
+/// Extracted text content from a document or scanned asset.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ExtractedContent {
+    pub text: String,
+    pub title: Option<String>,
+    pub mime_type: String,
+    pub confidence: Option<f32>,
+    pub extraction_method: String, // e.g. "plain_text", "pdf_text", "ocr_tesseract", "multimodal_vision"
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+/// Port for text extraction and multimodal processing (plain-text, PDF, OCR).
+pub trait TextExtractorPort: Send + Sync {
+    /// List of MIME types or file extensions supported by this extractor.
+    fn supported_formats(&self) -> &[&str];
+
+    /// Extract text content from raw bytes.
+    fn extract_text(&self, file_name: &str, bytes: &[u8]) -> Result<ExtractedContent, SearchError>;
+}
+

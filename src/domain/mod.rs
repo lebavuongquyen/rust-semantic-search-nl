@@ -149,6 +149,7 @@ impl EmbeddingVector {
 
 /// Structured filter criteria for hard constraints.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct QueryFilter {
     pub required_extensions: Vec<String>,
     pub required_tags: Vec<String>,

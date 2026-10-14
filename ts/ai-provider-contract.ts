@@ -121,8 +121,13 @@ export class AiProviderError extends Error {
 export interface AiProvider {
   readonly id: AiProviderId;
   readonly displayName: string;
-  listModels?(options?: { signal?: AbortSignal }): Promise<readonly AiModelDescriptor[]>;
-  describeModel?(modelId: AiModelId, options?: { signal?: AbortSignal }): Promise<AiModelDescriptor | undefined>;
+  listModels?(options?: {
+    signal?: AbortSignal;
+  }): Promise<readonly AiModelDescriptor[]>;
+  describeModel?(
+    modelId: AiModelId,
+    options?: { signal?: AbortSignal },
+  ): Promise<AiModelDescriptor | undefined>;
   generate(request: AiGenerateRequest): Promise<AiGenerateResponse>;
   embed?(request: AiEmbeddingRequest): Promise<AiEmbeddingResponse>;
 }
@@ -160,7 +165,10 @@ export class AiProviderRegistry {
   }
 
   list(): readonly Pick<AiProvider, "id" | "displayName">[] {
-    return [...this.providers.values()].map(({ id, displayName }) => ({ id, displayName }));
+    return [...this.providers.values()].map(({ id, displayName }) => ({
+      id,
+      displayName,
+    }));
   }
 
   async requireCapability(
@@ -197,7 +205,10 @@ export interface AiRoute {
 
 export interface AiRouterOptions {
   allowFallback?: boolean;
-  onFallback?: (error: AiProviderError, route: Omit<AiRoute, "fallbackRoutes">) => void;
+  onFallback?: (
+    error: AiProviderError,
+    route: Omit<AiRoute, "fallbackRoutes">,
+  ) => void;
 }
 
 export class AiRouter {
@@ -206,10 +217,19 @@ export class AiRouter {
     private readonly options: AiRouterOptions = {},
   ) {}
 
-  async generate(route: AiRoute, request: Omit<AiGenerateRequest, "model">): Promise<AiGenerateResponse> {
+  async generate(
+    route: AiRoute,
+    request: Omit<AiGenerateRequest, "model">,
+  ): Promise<AiGenerateResponse> {
     const candidates: Omit<AiRoute, "fallbackRoutes">[] = [
-      { providerId: route.providerId, modelId: route.modelId, requiredCapabilities: route.requiredCapabilities },
-      ...(this.options.allowFallback === false ? [] : route.fallbackRoutes ?? []),
+      {
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requiredCapabilities: route.requiredCapabilities,
+      },
+      ...(this.options.allowFallback === false
+        ? []
+        : (route.fallbackRoutes ?? [])),
     ];
     let lastError: AiProviderError | undefined;
 
@@ -217,20 +237,34 @@ export class AiRouter {
       try {
         const provider = this.registry.get(candidate.providerId);
         for (const capability of candidate.requiredCapabilities) {
-          await this.registry.requireCapability(candidate.providerId, candidate.modelId, capability);
+          await this.registry.requireCapability(
+            candidate.providerId,
+            candidate.modelId,
+            capability,
+          );
         }
-        return await provider.generate({ ...request, model: candidate.modelId });
+        return await provider.generate({
+          ...request,
+          model: candidate.modelId,
+        });
       } catch (error) {
-        lastError = error instanceof AiProviderError
-          ? error
-          : new AiProviderError({
-              message: error instanceof Error ? error.message : String(error),
-              code: "UNKNOWN",
-              providerId: candidate.providerId,
-              cause: error,
-            });
-        if (!lastError.retryable || candidate === candidates[candidates.length - 1]) {
-          if (!this.options.allowFallback || candidate === candidates[candidates.length - 1]) {
+        lastError =
+          error instanceof AiProviderError
+            ? error
+            : new AiProviderError({
+                message: error instanceof Error ? error.message : String(error),
+                code: "UNKNOWN",
+                providerId: candidate.providerId,
+                cause: error,
+              });
+        if (
+          !lastError.retryable ||
+          candidate === candidates[candidates.length - 1]
+        ) {
+          if (
+            !this.options.allowFallback ||
+            candidate === candidates[candidates.length - 1]
+          ) {
             throw lastError;
           }
         }

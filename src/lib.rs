@@ -10,6 +10,12 @@ pub mod security;
 pub mod similarity;
 pub mod thesaurus;
 
+use adapters::fakes::{InMemoryDocumentStore, ReciprocalRankFusion};
+use adapters::lexical_bm25::Bm25LexicalRetriever;
+use adapters::reranker::LexicalHeuristicReranker;
+use adapters::vector_index::MemoryVectorIndex;
+use application::SearchOrchestrator;
+use domain::{DistanceMetric, Document, DocumentId, EmbeddingSpace, EmbeddingVector, Query, QueryFilter};
 use fusion::HybridScorer;
 use query::{detect_language, extract_temporal, generate_code_naming_patterns, normalize_typos, ParsedSearchPlan};
 use thesaurus::ConceptRegistry;
@@ -18,6 +24,15 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct SemanticSearchAgent {
     thesaurus: ConceptRegistry,
+    orchestrator: SearchOrchestrator<
+        InMemoryDocumentStore,
+        Bm25LexicalRetriever,
+        MemoryVectorIndex,
+        adapters::fakes::FakeEmbeddingProvider,
+        ReciprocalRankFusion,
+        LexicalHeuristicReranker,
+    >,
+    embedding_space: EmbeddingSpace,
 }
 
 #[wasm_bindgen]
@@ -27,9 +42,183 @@ impl SemanticSearchAgent {
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
 
+        let space = EmbeddingSpace {
+            provider_id: "google-ai-studio".to_string(),
+            model_id: "text-embedding-004".to_string(),
+            revision: "v1".to_string(),
+            dimensions: 768,
+            distance_metric: DistanceMetric::Cosine,
+            normalized: true,
+            supported_languages: vec!["vi".to_string(), "en".to_string()],
+        };
+
+        let store = InMemoryDocumentStore::new();
+        let lexical = Bm25LexicalRetriever::default();
+        let vector = MemoryVectorIndex::new(space.clone());
+        let fusion = ReciprocalRankFusion::default();
+        let reranker = LexicalHeuristicReranker::default();
+
+        let orchestrator = SearchOrchestrator::new(
+            store,
+            Some(lexical),
+            Some(vector),
+            None,
+            fusion,
+        ).with_reranker(reranker);
+
         Self {
             thesaurus: ConceptRegistry::new(),
+            orchestrator,
+            embedding_space: space,
         }
+    }
+
+    /// Khởi tạo hoặc cập nhật không gian vector embedding (dimensions, provider_id, model_id)
+    #[wasm_bindgen(js_name = configureEmbeddingSpace)]
+    pub fn configure_embedding_space(
+        &mut self,
+        provider_id: &str,
+        model_id: &str,
+        dimensions: usize,
+    ) {
+        self.embedding_space = EmbeddingSpace {
+            provider_id: provider_id.to_string(),
+            model_id: model_id.to_string(),
+            revision: "v1".to_string(),
+            dimensions,
+            distance_metric: DistanceMetric::Cosine,
+            normalized: true,
+            supported_languages: vec!["vi".to_string(), "en".to_string()],
+        };
+        // Re-initialize vector index with new space
+        *self.orchestrator.vector_mut().unwrap() = MemoryVectorIndex::new(self.embedding_space.clone());
+    }
+
+    /// Nạp một tài liệu kèm danh sách văn bản các chunks và mảng vector phẳng (Float32Array)
+    #[wasm_bindgen(js_name = ingestDocumentWithVectors)]
+    pub fn ingest_document_with_vectors(
+        &mut self,
+        doc_id: &str,
+        title: &str,
+        content: &str,
+        chunk_texts_js: JsValue,
+        chunk_vectors_flat: &[f32],
+        dimensions: usize,
+        file_path: Option<String>,
+        metadata_json: Option<String>,
+    ) -> Result<JsValue, JsValue> {
+        let chunk_texts: Vec<String> = serde_wasm_bindgen::from_value(chunk_texts_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid chunk_texts: {}", e)))?;
+
+        let num_chunks = chunk_texts.len();
+        if chunk_vectors_flat.len() != num_chunks * dimensions {
+            return Err(JsValue::from_str(&format!(
+                "Vector buffer length {} does not match num_chunks ({}) * dimensions ({})",
+                chunk_vectors_flat.len(),
+                num_chunks,
+                dimensions
+            )));
+        }
+
+        let mut vectors = Vec::with_capacity(num_chunks);
+        for chunk_idx in 0..num_chunks {
+            let start = chunk_idx * dimensions;
+            let end = start + dimensions;
+            let slice = chunk_vectors_flat[start..end].to_vec();
+            let emb_vec = EmbeddingVector::new(self.embedding_space.clone(), slice)
+                .map_err(|e| JsValue::from_str(&format!("Vector validation error: {}", e)))?;
+            vectors.push(emb_vec);
+        }
+
+        let mut doc = Document::new(doc_id, title, content);
+        if let Some(path) = file_path {
+            doc = doc.with_file_path(path);
+        }
+        if let Some(ref json_str) = metadata_json {
+            if let Ok(map) = serde_json::from_str::<std::collections::HashMap<String, String>>(json_str) {
+                for (k, v) in map {
+                    doc = doc.with_metadata(k, v);
+                }
+            }
+        }
+
+        let chunk_ids = self
+            .orchestrator
+            .ingest_document_with_vectors(doc, chunk_texts, vectors)
+            .map_err(|e| JsValue::from_str(&format!("Ingest error: {}", e)))?;
+
+        let id_strings: Vec<String> = chunk_ids.into_iter().map(|c| c.0).collect();
+        serde_wasm_bindgen::to_value(&id_strings)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    }
+
+    /// Tìm kiếm kết hợp (BM25 + Vector + RRF + Filters + Reranker) với vector query truyền từ JS
+    #[wasm_bindgen(js_name = searchWithVector)]
+    pub fn search_with_vector(
+        &self,
+        raw_query: &str,
+        query_vector: Option<Vec<f32>>,
+        top_k: usize,
+        filter_json: Option<String>,
+    ) -> Result<JsValue, JsValue> {
+        let mut query = Query::new(raw_query).with_top_k(top_k);
+
+        if let Some(f_str) = filter_json {
+            if !f_str.trim().is_empty() {
+                let filter: QueryFilter = serde_json::from_str(&f_str)
+                    .map_err(|e| JsValue::from_str(&format!("Invalid QueryFilter JSON: {}", e)))?;
+                query.filter = filter;
+            }
+        }
+
+        let parsed_query_vector = if let Some(vals) = query_vector {
+            if vals.is_empty() {
+                None
+            } else {
+                let emb = EmbeddingVector::new(self.embedding_space.clone(), vals)
+                    .map_err(|e| JsValue::from_str(&format!("Query vector validation error: {}", e)))?;
+                Some(emb)
+            }
+        } else {
+            None
+        };
+
+        let results = self
+            .orchestrator
+            .search_with_vector(&query, parsed_query_vector.as_ref())
+            .map_err(|e| JsValue::from_str(&format!("Search error: {}", e)))?;
+
+        serde_wasm_bindgen::to_value(&results)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    }
+
+    /// Xóa một tài liệu và lan truyền xóa toàn bộ các chunks trong index BM25 và Vector
+    #[wasm_bindgen(js_name = deleteDocument)]
+    pub fn delete_document(&mut self, doc_id: &str) -> Result<bool, JsValue> {
+        self.orchestrator
+            .delete_document(&DocumentId(doc_id.to_string()))
+            .map_err(|e| JsValue::from_str(&format!("Delete error: {}", e)))
+    }
+
+    /// Thống kê số lượng vector trong index
+    #[wasm_bindgen(js_name = getIndexStats)]
+    pub fn get_index_stats(&self) -> JsValue {
+        #[derive(serde::Serialize)]
+        struct IndexStats {
+            pub vector_index_len: usize,
+            pub dimensions: usize,
+            pub provider_id: String,
+            pub model_id: String,
+        }
+
+        let stats = IndexStats {
+            vector_index_len: self.orchestrator.vector().map(|v| v.len()).unwrap_or(0),
+            dimensions: self.embedding_space.dimensions,
+            provider_id: self.embedding_space.provider_id.clone(),
+            model_id: self.embedding_space.model_id.clone(),
+        };
+
+        serde_wasm_bindgen::to_value(&stats).unwrap_or(JsValue::NULL)
     }
 
     /// Phân tích câu hỏi tự nhiên thành Kế hoạch tìm kiếm ngữ nghĩa toàn diện (Search Plan)

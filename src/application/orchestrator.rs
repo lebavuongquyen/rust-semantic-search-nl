@@ -342,6 +342,186 @@ impl<
         Ok(results)
     }
 
+    /// Ingest a document and its pre-computed embedding vectors directly (bypassing embedder port).
+    /// Used by WASM / client bridges where embedding inference is performed asynchronously on the client/runtime.
+    pub fn ingest_document_with_vectors(
+        &mut self,
+        doc: Document,
+        chunk_texts: Vec<String>,
+        vectors: Vec<crate::domain::EmbeddingVector>,
+    ) -> Result<Vec<ChunkId>, SearchError> {
+        if chunk_texts.len() != vectors.len() {
+            return Err(SearchError::InvalidConfiguration(format!(
+                "Mismatch between chunk texts ({}) and vectors ({})",
+                chunk_texts.len(),
+                vectors.len()
+            )));
+        }
+
+        let doc_id = doc.id.clone();
+        if self.doc_chunks_map.contains_key(&doc_id) {
+            let _ = self.delete_document(&doc_id);
+        }
+
+        let mut metadata = doc.metadata.clone();
+        if let Some(ref path) = doc.file_path {
+            metadata.insert("file_path".to_string(), path.clone());
+        }
+        self.store.put_document(doc)?;
+
+        let mut indexed_lexical = Vec::new();
+        let mut indexed_vector = Vec::new();
+        let mut stored_chunks = Vec::new();
+        let mut chunks = Vec::new();
+        let mut ingest_err: Option<SearchError> = None;
+
+        let mut current_offset = 0;
+        for (idx, (text, vector)) in chunk_texts.into_iter().zip(vectors.into_iter()).enumerate() {
+            let chunk_id = ChunkId(format!("{}-c{}", doc_id, idx));
+            let end_offset = current_offset + text.len();
+            let chunk = Chunk {
+                id: chunk_id.clone(),
+                document_id: doc_id.clone(),
+                chunk_index: idx,
+                text,
+                start_offset: current_offset,
+                end_offset,
+                metadata: metadata.clone(),
+            };
+            current_offset = end_offset;
+
+            if let Some(lex) = &mut self.lexical {
+                if let Err(e) = lex.index_chunk(&chunk) {
+                    ingest_err = Some(e);
+                    break;
+                }
+                indexed_lexical.push(chunk_id.clone());
+            }
+
+            if let Some(vec_retriever) = &mut self.vector {
+                if let Err(e) = vec_retriever.index_vector(&chunk_id, &vector) {
+                    ingest_err = Some(e);
+                    break;
+                }
+                indexed_vector.push(chunk_id.clone());
+            }
+
+            if let Err(e) = self.store.put_chunk(chunk) {
+                ingest_err = Some(e);
+                break;
+            }
+            stored_chunks.push(chunk_id.clone());
+            chunks.push(chunk_id);
+        }
+
+        if let Some(err) = ingest_err {
+            if let Some(lex) = &mut self.lexical {
+                for cid in &indexed_lexical {
+                    let _ = lex.remove_chunk(cid);
+                }
+            }
+            if let Some(vec_retriever) = &mut self.vector {
+                for cid in &indexed_vector {
+                    let _ = vec_retriever.remove_vector(cid);
+                }
+            }
+            for cid in &stored_chunks {
+                let _ = self.store.delete_chunk(cid);
+            }
+            let _ = self.store.delete_document(&doc_id);
+            return Err(err);
+        }
+
+        self.doc_chunks_map.insert(doc_id, chunks.clone());
+        Ok(chunks)
+    }
+
+    /// Search with a pre-computed query embedding vector alongside standard lexical retrieval and fusion.
+    pub fn search_with_vector(
+        &self,
+        query: &Query,
+        query_vector: Option<&crate::domain::EmbeddingVector>,
+    ) -> Result<Vec<SearchResult>, SearchError> {
+        if query.top_k == 0 {
+            return Ok(Vec::new());
+        }
+
+        let candidate_limit = query.top_k.saturating_mul(3).max(10).min(500);
+
+        let lexical_candidates = match &self.lexical {
+            Some(lex) => lex.search(query, candidate_limit)?,
+            None => Vec::new(),
+        };
+
+        let vector_candidates = match (&self.vector, query_vector) {
+            (Some(vec_retriever), Some(vec)) => vec_retriever.search_vector(vec, candidate_limit)?,
+            _ => match (&self.vector, &self.embedder) {
+                (Some(vec_retriever), Some(emb_provider)) => {
+                    let v = emb_provider.embed_text(&query.raw_query)?;
+                    vec_retriever.search_vector(&v, candidate_limit)?
+                }
+                _ => Vec::new(),
+            },
+        };
+
+        if lexical_candidates.is_empty() && vector_candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let fused = self.fusion_policy.fuse(
+            &lexical_candidates,
+            &vector_candidates,
+            candidate_limit,
+        )?;
+
+        let mut results = Vec::new();
+        let mut rank = 1;
+
+        for (chunk_id, score, mut provenance) in fused {
+            let chunk = match self.store.get_chunk(&chunk_id)? {
+                Some(c) => c,
+                None => continue,
+            };
+
+            let doc = match self.store.get_document(&chunk.document_id)? {
+                Some(d) => d,
+                None => continue,
+            };
+
+            if !self.passes_filter(&chunk, &doc, &query.filter) {
+                continue;
+            }
+
+            provenance.document_id = doc.id.clone();
+            for (k, v) in &chunk.metadata {
+                provenance.trace_details.insert(k.clone(), v.clone());
+            }
+
+            results.push(SearchResult {
+                rank,
+                chunk_id: chunk.id,
+                document_id: doc.id,
+                document_title: doc.title,
+                snippet: chunk.text,
+                score,
+                provenance,
+            });
+
+            rank += 1;
+            if results.len() >= query.top_k * 2 {
+                break;
+            }
+        }
+
+        if let Some(reranker) = &self.reranker {
+            results = reranker.rerank(&query.raw_query, results, query.top_k)?;
+        } else if results.len() > query.top_k {
+            results.truncate(query.top_k);
+        }
+
+        Ok(results)
+    }
+
     fn passes_filter(&self, chunk: &Chunk, doc: &Document, filter: &QueryFilter) -> bool {
         let chunk_lower = chunk.text.to_lowercase();
         let title_lower = doc.title.to_lowercase();
