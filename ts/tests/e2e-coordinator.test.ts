@@ -208,7 +208,7 @@ async function runTests() {
     }
   });
 
-  // 5. Deletion propagation check
+  // 5. Deleting document removes vectors from WASM index
   await test("Deleting document removes vectors from WASM index", async () => {
     const statsBefore = coordinator.getStats();
     const deleted = coordinator.deleteDocument("doc-auth");
@@ -217,6 +217,34 @@ async function runTests() {
     const statsAfter = coordinator.getStats();
     if (statsAfter.vector_index_len >= statsBefore.vector_index_len) {
       throw new Error("Vector count in index should decrease after deletion");
+    }
+  });
+
+  // 6. Zero-AI mode: coordinator runs without provider or API key using BM25 and offline vector index
+  await test("Zero-AI mode: coordinator runs without provider or API key using BM25 and offline math vector index", async () => {
+    const offlineCoordinator = new SemanticSearchCoordinator();
+    await offlineCoordinator.ingestDocument({
+      id: "doc-offline-manual",
+      title: "Local Offline Installation Guide",
+      content:
+        "Complete offline installation and maintenance guide without internet access.",
+    });
+
+    const { results, embeddingSource } = await offlineCoordinator.search(
+      "offline installation maintenance",
+    );
+    if (embeddingSource !== "local_offline") {
+      throw new Error(`Expected source local_offline, got ${embeddingSource}`);
+    }
+    if (results.length === 0) {
+      throw new Error("Expected offline search results");
+    }
+    const topId =
+      typeof results[0].document_id === "string"
+        ? results[0].document_id
+        : results[0].document_id?.[0];
+    if (topId !== "doc-offline-manual") {
+      throw new Error(`Expected doc-offline-manual, got ${topId}`);
     }
   });
 

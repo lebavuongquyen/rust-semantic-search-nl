@@ -59,16 +59,17 @@ export class SemanticSearchCoordinator {
   private readonly embedder: EmbeddingLoadBalancer;
 
   constructor(
-    embedder: EmbeddingLoadBalancer,
+    embedder?: EmbeddingLoadBalancer,
     options?: { providerId?: string; modelId?: string },
   ) {
-    this.embedder = embedder;
+    this.embedder = embedder ?? new EmbeddingLoadBalancer();
     this.wasmAgent = new SemanticSearchAgent();
     // Sync embedding space to match balancer dimensions
     this.wasmAgent.configureEmbeddingSpace(
-      options?.providerId ?? "google-ai-studio",
-      options?.modelId ?? "gemini-embedding-001",
-      embedder.unifiedDimensions,
+      options?.providerId ?? (embedder ? "google-ai-studio" : "local-offline"),
+      options?.modelId ??
+        (embedder ? "gemini-embedding-001" : "offline-math-embedder"),
+      this.embedder.unifiedDimensions,
     );
   }
 

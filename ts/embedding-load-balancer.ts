@@ -67,9 +67,9 @@ export interface EmbeddingSlotConfig {
 }
 
 export interface EmbeddingLoadBalancerOptions {
-  readonly slots: readonly EmbeddingSlotConfig[];
-  readonly localFallback: LocalEmbedder;
-  readonly unifiedDimensions: number;
+  readonly slots?: readonly EmbeddingSlotConfig[];
+  readonly localFallback?: LocalEmbedder;
+  readonly unifiedDimensions?: number;
   readonly defaultTimeoutMs?: number;
   readonly strategy?: "priority" | "round_robin";
 }
@@ -86,7 +86,7 @@ export interface EmbeddingSlotState {
 export interface LoadBalancedEmbedResult {
   readonly vectors: readonly (readonly number[])[];
   readonly dimensions: number;
-  readonly source: string; // e.g. "gemini-slot:gemini-embedding-001" | "local_fallback"
+  readonly source: string; // e.g. "gemini-slot:gemini-embedding-001" | "local_fallback" | "local_offline"
   readonly attemptedSlots: readonly string[];
   readonly errorDetails?: readonly string[];
 }
@@ -100,20 +100,17 @@ export class EmbeddingLoadBalancer {
   readonly strategy: "priority" | "round_robin";
 
   constructor(
-    private readonly provider: AiProvider,
-    options: EmbeddingLoadBalancerOptions,
+    private readonly provider?: AiProvider,
+    options?: EmbeddingLoadBalancerOptions,
   ) {
-    if (options.slots.length === 0) {
-      throw new Error(
-        "EmbeddingLoadBalancer requires at least one model slot configured.",
-      );
-    }
-    this.localFallback = options.localFallback;
-    this.unifiedDimensions = options.unifiedDimensions;
-    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 8000;
-    this.strategy = options.strategy ?? "priority";
+    this.unifiedDimensions = options?.unifiedDimensions ?? 3072;
+    this.localFallback =
+      options?.localFallback ??
+      new LocalDeterministicEmbedder(this.unifiedDimensions);
+    this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 8000;
+    this.strategy = options?.strategy ?? "priority";
 
-    this.slotStates = options.slots.map((s) => ({
+    this.slotStates = (options?.slots ?? []).map((s) => ({
       modelId: s.modelId,
       cooldownMs: s.cooldownMs ?? 60_000,
       cooldownUntil: 0,
@@ -150,6 +147,16 @@ export class EmbeddingLoadBalancer {
         vectors: [],
         dimensions: this.unifiedDimensions,
         source: "noop",
+        attemptedSlots: [],
+      };
+    }
+
+    if (this.slotStates.length === 0 || !this.provider) {
+      const fallbackVectors = await this.localFallback.embed(texts);
+      return {
+        vectors: fallbackVectors,
+        dimensions: this.localFallback.dimensions,
+        source: "local_offline",
         attemptedSlots: [],
       };
     }
