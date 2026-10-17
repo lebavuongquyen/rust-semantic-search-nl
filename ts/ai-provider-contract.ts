@@ -63,6 +63,8 @@ export interface AiEmbeddingRequest {
   model: AiModelId;
   inputs: readonly string[];
   options?: AiRequestOptions;
+  taskType?: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY" | "SEMANTIC_SIMILARITY";
+  title?: string;
 }
 
 export interface AiEmbeddingResponse {

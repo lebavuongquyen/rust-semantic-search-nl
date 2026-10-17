@@ -248,6 +248,28 @@ async function runTests() {
     }
   });
 
+  // 7. Parent-child context retrieval and HyDE natural language search
+  await test("Parent-Child context window and HyDE natural language search", async () => {
+    const { results } = await coordinator.search("corporate services invoice", {
+      enableHyDE: true,
+    });
+    if (results.length === 0) {
+      throw new Error("Expected search results for corporate services invoice");
+    }
+    const top = results[0];
+    if (!top.parent_context) {
+      throw new Error(
+        "Expected parent_context to be attached to search result",
+      );
+    }
+    if (!top.parent_context.title) {
+      throw new Error("Expected parent_context.title to be present");
+    }
+    if (top.parent_context.full_content_length <= 0) {
+      throw new Error("Expected parent_context.full_content_length > 0");
+    }
+  });
+
   console.log("-------------------------------------------------------");
   console.log(
     `E2E Search Coordinator Tests: ${passed} passed, ${failed} failed`,

@@ -84,19 +84,22 @@ Milestones are sequential acceptance gates, not dates. Follow [the detailed road
 
 ## 5. Current Verified Quality Gates
 
-- `cargo test`: **35 passed, 0 failed** across all native test suites (`m01` through `m11`, `cache`, `neural_embedder`).
+- `cargo test`: **36 passed, 0 failed** across all native test suites (`m01` through `m11`, `cache`, `neural_embedder`, and `anti_hardcode_gate_test`).
+- Automated Anti-Hardcode Quality Gate active in CI suite.
+- Zero-hardcode numerical timestamp range filtering (`TemporalRange`).
 - `cargo check --target wasm32-unknown-unknown`: passed (0 warnings, 0 errors).
-- TypeScript verification suites: **22 passed, 0 failed** across all suites:
+- TypeScript verification suites: **24 passed, 0 failed** across all suites:
   - `provider-contract.test.ts`: 9 passed
   - `embedding-load-balancer.test.ts`: 5 passed
-  - `e2e-coordinator.test.ts`: 5 passed
+  - `e2e-coordinator.test.ts`: 7 passed (including HyDE & Parent-Child Context)
   - `directory-crawler.test.ts`: 3 passed
 - Live Google AI Studio Semantic Search Suite: **5 passed, 0 failed** (`live-semantic-search.test.ts`):
   - Genuine 3072-dim embeddings via `gemini-embedding-001` and `gemini-embedding-2`
   - Cross-lingual retrieval (Vi -> En and En -> Vi with zero lexical word overlap)
+  - Asymmetric task type retrieval (`RETRIEVAL_DOCUMENT` with Title context vs `RETRIEVAL_QUERY`)
   - Slot failover on simulated 429 cooldown
   - Structured hard constraint filtering (negative keywords)
-- **Grand Total: 62 passed, 0 failed**.
+- **Grand Total: 65 passed, 0 failed**.
 
 ## 6. Definition of done for each milestone
 

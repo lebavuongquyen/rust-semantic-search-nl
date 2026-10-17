@@ -182,13 +182,23 @@ export class GoogleAiStudioProvider implements AiProvider {
   async embed(request: AiEmbeddingRequest): Promise<AiEmbeddingResponse> {
     const vectors: number[][] = [];
     for (const input of request.inputs) {
+      const body: Record<string, unknown> = {
+        content: { parts: [{ text: input }] },
+      };
+      if (request.taskType) {
+        body.taskType = request.taskType;
+      }
+      if (request.title && request.taskType === "RETRIEVAL_DOCUMENT") {
+        body.title = request.title;
+      }
+
       const payload = await this.request<{
         embedding?: { values?: number[] };
       }>(`/models/${encodeURIComponent(request.model)}:embedContent`, {
         method: "POST",
         signal: request.options?.signal,
         timeoutMs: request.options?.timeoutMs,
-        body: { content: { parts: [{ text: input }] } },
+        body,
       });
       const values = payload.embedding?.values;
       if (!values?.length || values.some((value) => !Number.isFinite(value))) {

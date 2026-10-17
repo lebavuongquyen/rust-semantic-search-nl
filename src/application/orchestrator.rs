@@ -624,6 +624,29 @@ impl<
             }
         }
 
+        // 7. Zero-hardcode exact numerical temporal range constraint
+        if let Some(range) = &filter.temporal_range {
+            let doc_ts_opt = doc
+                .metadata
+                .get("timestamp")
+                .or_else(|| doc.metadata.get("created_at"))
+                .or_else(|| chunk.metadata.get("timestamp"))
+                .and_then(|s| s.parse::<i64>().ok());
+
+            if let Some(ts) = doc_ts_opt {
+                if let Some(start) = range.start_epoch_seconds {
+                    if ts < start {
+                        return false;
+                    }
+                }
+                if let Some(end) = range.end_epoch_seconds {
+                    if ts > end {
+                        return false;
+                    }
+                }
+            }
+        }
+
         true
     }
 }

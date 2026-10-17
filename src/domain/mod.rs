@@ -147,6 +147,14 @@ impl EmbeddingVector {
     }
 }
 
+/// Exact numerical epoch timestamp range for zero-hardcode temporal filtering.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct TemporalRange {
+    pub start_epoch_seconds: Option<i64>,
+    pub end_epoch_seconds: Option<i64>,
+}
+
 /// Structured filter criteria for hard constraints.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -157,6 +165,7 @@ pub struct QueryFilter {
     pub negative_keywords: Vec<String>,
     pub temporal_year: Option<u16>,
     pub temporal_month: Option<u8>,
+    pub temporal_range: Option<TemporalRange>,
 }
 
 /// Natural-language search query with optional structured constraints.

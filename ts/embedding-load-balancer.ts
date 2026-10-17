@@ -91,6 +91,14 @@ export interface LoadBalancedEmbedResult {
   readonly errorDetails?: readonly string[];
 }
 
+export interface LoadBalancerEmbedOptions {
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+  readonly taskType?:
+    "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY" | "SEMANTIC_SIMILARITY";
+  readonly title?: string;
+}
+
 export class EmbeddingLoadBalancer {
   private readonly slotStates: EmbeddingSlotState[];
   private currentSlotIndex = 0;
@@ -124,6 +132,10 @@ export class EmbeddingLoadBalancer {
     return this.slotStates;
   }
 
+  getProvider(): AiProvider | undefined {
+    return this.provider;
+  }
+
   /**
    * Reset cooldowns (used in test or recovery procedures)
    */
@@ -140,7 +152,7 @@ export class EmbeddingLoadBalancer {
    */
   async embed(
     texts: readonly string[],
-    options?: { timeoutMs?: number; signal?: AbortSignal },
+    options?: LoadBalancerEmbedOptions,
   ): Promise<LoadBalancedEmbedResult> {
     if (texts.length === 0) {
       return {
@@ -193,6 +205,8 @@ export class EmbeddingLoadBalancer {
         const res: AiEmbeddingResponse = await this.provider.embed({
           model: slot.modelId,
           inputs: texts,
+          taskType: options?.taskType,
+          title: options?.title,
           options: {
             timeoutMs,
             signal: options?.signal,

@@ -139,20 +139,23 @@ Apply relevant gates to each change:
 
 ## 8. Verified Reality and Completion Status
 
-- Native Rust test suite: **35 passed, 0 failed** (`cargo test`)
+- Native Rust test suite: **36 passed, 0 failed** (`cargo test`)
+  - Includes automated Anti-Hardcode Quality Gate (`tests/anti_hardcode_gate_test.rs`) enforcing zero dictionary mappings in `src/` and `ts/`.
+  - Zero-hardcode numerical timestamp range filtering (`TemporalRange`).
 - WASM target compilation: **Passed** (`cargo check --target wasm32-unknown-unknown`)
-- TypeScript contract & E2E verification: **22 passed, 0 failed**
+- TypeScript contract & E2E verification: **24 passed, 0 failed**
   - Contract & error mapping: 9 passed
   - Embedding load balancing & rate-limit cooldown: 5 passed
-  - TS-WASM FFI integration & local fallback: 5 passed
+  - TS-WASM FFI integration, HyDE & Parent-Child Context: 7 passed
   - Recursive directory crawler: 3 passed
 - Live Google AI Studio Semantic Search Suite: **5 passed, 0 failed** (`ts/tests/live-semantic-search.test.ts`)
   - Genuine 3072-dimension neural embeddings via `gemini-embedding-001` and `gemini-embedding-2`
   - Genuine cross-lingual retrieval verified (Vietnamese cloud query -> English AWS billing doc; English telecom query -> Vietnamese Viettel invoice doc; with zero lexical word overlap)
+  - Asymmetric task type retrieval (`RETRIEVAL_DOCUMENT` with Title context vs `RETRIEVAL_QUERY`)
   - Slot failover on simulated 429 cooldown to secondary model slot
   - Structured hard constraint filtering (negative keywords)
 - Model Discovery & Dimensions recorded in `docs/EMBEDDING_PROBE_RESULTS.md`
-- Total verified test suite: **62 passed, 0 failed**
+- Total verified test suite: **65 passed, 0 failed** (36 Rust + 24 TS + 5 Live)
 - Complete granular fallback: Rate limit (429) or network outages on Gemini remote slots seamlessly trigger in-place fallback to local deterministic embedding without aborting the search pipeline.
 
 

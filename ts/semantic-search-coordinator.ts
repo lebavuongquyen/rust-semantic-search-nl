@@ -20,6 +20,11 @@ export interface ChunkDefinition {
   readonly endOffset: number;
 }
 
+export interface TemporalRangeFilter {
+  readonly start_epoch_seconds?: number;
+  readonly end_epoch_seconds?: number;
+}
+
 export interface SearchQueryFilter {
   readonly required_extensions?: readonly string[];
   readonly required_tags?: readonly string[];
@@ -27,6 +32,7 @@ export interface SearchQueryFilter {
   readonly negative_keywords?: readonly string[];
   readonly temporal_year?: number;
   readonly temporal_month?: number;
+  readonly temporal_range?: TemporalRangeFilter;
 }
 
 export interface SearchExecutionResult {
@@ -35,6 +41,11 @@ export interface SearchExecutionResult {
   readonly document_id: { 0: string };
   readonly document_title: string;
   readonly snippet: string;
+  readonly parent_context?: {
+    readonly title: string;
+    readonly full_content_length: number;
+    readonly preview: string;
+  };
   readonly score: {
     readonly final_score: number;
     readonly components: readonly {
@@ -57,6 +68,7 @@ export interface SearchExecutionResult {
 export class SemanticSearchCoordinator {
   private readonly wasmAgent: any;
   private readonly embedder: EmbeddingLoadBalancer;
+  private readonly parentDocs = new Map<string, DocumentInput>();
 
   constructor(
     embedder?: EmbeddingLoadBalancer,
@@ -188,6 +200,9 @@ export class SemanticSearchCoordinator {
       metadataJson,
     );
 
+    // Store parent document for rich context retrieval
+    this.parentDocs.set(doc.id, doc);
+
     return {
       chunkCount: chunkTexts.length,
       embeddingSource: embedRes.source,
@@ -195,31 +210,81 @@ export class SemanticSearchCoordinator {
   }
 
   /**
+   * Zero-hardcode natural language hypothetical document generator (HyDE).
+   * Generates a hypothetical excerpt that directly answers the query to project into document embedding space.
+   */
+  async generateHypotheticalPassage(
+    query: string,
+    modelId = "gemini-1.5-flash",
+  ): Promise<string | undefined> {
+    const provider = this.embedder.getProvider();
+    if (!provider || !provider.generate) return undefined;
+    try {
+      const res = await provider.generate({
+        model: modelId,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful search assistant. Given the search query, write a realistic, hypothetical passage or excerpt from an ideal document that directly satisfies this query. Do not include introductory remarks or pleasantries. Output only the passage text.",
+          },
+          { role: "user", content: query },
+        ],
+        options: { temperature: 0.3, maxOutputTokens: 200, timeoutMs: 5000 },
+      });
+      const text = res.text?.trim();
+      return text && text.length > 10 ? text : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Search query:
-   * 1. Generate query vector via LoadBalancer
-   * 2. Invoke Rust WASM hybrid retriever (BM25 + Vector + RRF + Filters + Reranker)
-   * 3. Annotate provenance with actual embedding source
+   * 1. Optional HyDE (Hypothetical Document Embeddings) expansion for deep natural language understanding
+   * 2. Generate query vector via LoadBalancer with RETRIEVAL_QUERY taskType
+   * 3. Invoke Rust WASM hybrid retriever (BM25 + Vector + RRF + Filters + Reranker)
+   * 4. Attach parent document context window to each result for full situational awareness
    */
   async search(
     rawQuery: string,
     options?: {
       topK?: number;
       filter?: SearchQueryFilter;
+      enableHyDE?: boolean;
+      hydeModel?: string;
     },
   ): Promise<{ results: SearchExecutionResult[]; embeddingSource: string }> {
     const topK = options?.topK ?? 10;
     const filterJson = options?.filter ? JSON.stringify(options.filter) : null;
 
-    // Step 1: Embed the search query
-    const embedRes: LoadBalancedEmbedResult = await this.embedder.embed([
-      rawQuery,
-    ]);
+    let textToEmbed = rawQuery;
+    let hydePassage: string | undefined = undefined;
+
+    // Step 1: If HyDE is enabled, synthesize a hypothetical document passage first
+    if (options?.enableHyDE) {
+      hydePassage = await this.generateHypotheticalPassage(
+        rawQuery,
+        options.hydeModel,
+      );
+      if (hydePassage) {
+        textToEmbed = hydePassage;
+      }
+    }
+
+    // Step 2: Embed the search query (or hypothetical passage) with RETRIEVAL_QUERY taskType
+    const embedRes: LoadBalancedEmbedResult = await this.embedder.embed(
+      [textToEmbed],
+      {
+        taskType: "RETRIEVAL_QUERY",
+      },
+    );
     const queryVector =
       embedRes.vectors.length > 0
         ? new Float32Array(embedRes.vectors[0])
         : null;
 
-    // Step 2: Execute search in Rust WASM
+    // Step 3: Execute search in Rust WASM
     const results: SearchExecutionResult[] = this.wasmAgent.searchWithVector(
       rawQuery,
       queryVector,
@@ -227,14 +292,33 @@ export class SemanticSearchCoordinator {
       filterJson,
     );
 
-    // Annotate trace with embedding provenance
+    // Step 4: Annotate trace with embedding provenance and attach parent context
     for (const res of results) {
       if (res.provenance && res.provenance.trace_details) {
         res.provenance.trace_details["embedding_source"] = embedRes.source;
+        if (hydePassage) {
+          res.provenance.trace_details["hyde_applied"] = "true";
+          res.provenance.trace_details["hypothetical_passage"] =
+            hydePassage.substring(0, 120);
+        }
         if (embedRes.attemptedSlots.length > 0) {
           res.provenance.trace_details["attempted_embedding_slots"] =
             embedRes.attemptedSlots.join(",");
         }
+      }
+
+      // Attach rich parent document context
+      const docIdStr =
+        typeof res.document_id === "object"
+          ? (res.document_id as any)[0] || String(res.document_id)
+          : String(res.document_id);
+      const parentDoc = this.parentDocs.get(docIdStr);
+      if (parentDoc) {
+        (res as any).parent_context = {
+          title: parentDoc.title,
+          full_content_length: parentDoc.content.length,
+          preview: parentDoc.content.substring(0, 250),
+        };
       }
     }
 
@@ -245,6 +329,7 @@ export class SemanticSearchCoordinator {
   }
 
   deleteDocument(docId: string): boolean {
+    this.parentDocs.delete(docId);
     return this.wasmAgent.deleteDocument(docId);
   }
 
