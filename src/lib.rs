@@ -305,7 +305,7 @@ mod tests {
         let plan = agent.parse_query_internal(user_query);
 
         assert_eq!(plan.language, "vi");
-        assert!(plan.normalized_query.contains("biên lai"));
+        assert_eq!(plan.normalized_query, "tìm biên lại thu tiền tháng 8");
 
         // Phải bắt được tháng 8 và mẫu "tháng 08"
         assert!(plan.temporal_info.is_some());

@@ -52,15 +52,15 @@ pub fn detect_language(query: &str) -> &'static str {
     "en"
 }
 
-/// Chuẩn hóa các lỗi gõ phím tiếng Việt phổ biến (Typo & Telex normalizer)
+/// Chuẩn hóa chuỗi truy vấn (Unicode NFC và chuẩn hóa khoảng trắng)
 pub fn normalize_typos(query: &str) -> String {
-    let mut result = query.to_string();
-
-    // Sửa lỗi gõ dấu thường gặp: "biên lại" -> "biên lai"
-    result = result.replace("biên lại", "biên lai");
-    result = result.replace("bien lai", "biên lai");
-
-    result
+    use unicode_normalization::UnicodeNormalization;
+    query
+        .nfc()
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join(" ")
 }
 
 /// Loại bỏ dấu tiếng Việt để tạo slug không dấu (URL / Code Route friendly)

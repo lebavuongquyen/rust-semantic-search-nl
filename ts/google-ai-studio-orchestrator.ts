@@ -197,9 +197,9 @@ export class GoogleAiStudioSearchOrchestrator {
     const systemPrompt = `You are a high-speed Multilingual Semantic Search Query Planner.
 Your job is to analyze the user's natural language search query and output a strict JSON search specification.
 Rules:
-1. Translate concepts cross-lingually (e.g., if user searches "hóa đơn", include "invoice", "receipt", "giấy nộp tiền", "bill", "thu phí", "lệ phí").
-2. Extract temporal patterns (e.g. Month 8 -> ["tháng 8", "tháng 08", "08/2026", "2608", "august", "aug"]).
-3. Infer coding file routes if technical.
+1. Translate and expand concepts cross-lingually across relevant languages (e.g. Vietnamese, English) based strictly on semantic context.
+2. Extract temporal patterns if mentioned (e.g. month, year, quarters).
+3. Infer technical naming patterns or coding file routes if query is technical.
 Output MUST be strict JSON only matching this format:
 {
   "language": "vi|en|ja|zh",
