@@ -1,6 +1,40 @@
+# Build and compilation outputs
 /target
 /pkg
 /pkg-web
-.env
+dist/
+
+# Dependencies
 node_modules/
+
+# Secrets & environment
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Test outputs, reports, and screenshots
+test-results/
+playwright-report/
+cypress/screenshots/
+cypress/videos/
+screenshots/
+coverage/
+.nyc_output/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.log
+*.out
+*.tmp
+
+# System and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
 
